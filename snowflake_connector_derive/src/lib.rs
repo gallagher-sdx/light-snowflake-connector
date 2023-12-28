@@ -37,7 +37,7 @@ fn impl_snowflake_deserialize(ast: &DeriveInput) -> TokenStream {
         Data::Union(_) => panic!("This macro can only be derived in a struct, not union."),
     };
     let gen = quote! {
-        impl #impl_generics snowflake_connector_derive::SnowflakeDeserialize for #name #ty_generics #where_clause {
+        impl #impl_generics snowflake_connector::SnowflakeDeserialize for #name #ty_generics #where_clause {
             fn snowflake_deserialize(
                 response: snowflake_connector::SnowflakeSQLResponse,
             ) -> std::result::Result<snowflake_connector::SnowflakeSQLResult<Self>, anyhow::Error> {
