@@ -41,6 +41,7 @@ fn impl_snowflake_deserialize(ast: &DeriveInput) -> TokenStream {
             fn snowflake_deserialize(
                 response: SnowflakeSQLResponse,
             ) -> std::result::Result<SnowflakeSQLResult<Self>, anyhow::Error> {
+                use snowflake_connector::DeserializeFromStr;
                 let count = response.result_set_meta_data.num_rows;
                 let mut results = Vec::with_capacity(count);
                 for data in response.data {
