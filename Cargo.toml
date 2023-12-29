@@ -1,7 +1,29 @@
-[workspace]
-resolver = "2"
-members = [
-    "snowflake-connector",
-    "snowflake-deserializer",
-    "snowflake_connector_derive",
-]
+[package]
+name = "light-snowflake-connector"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Lightweight wrapper around Snowflake's REST API"
+readme = "README.md"
+repository = "https://github.com/gallagher-sdx/snowflake-connector"
+keywords = ["snowflake", "data-science"]
+categories = ["database"]
+
+[features]
+live-tests = []
+
+[dependencies]
+thiserror = "1.0.37"
+
+serde = { version = "1.0.147", features = ["derive"] }
+reqwest = { version = "0.11", features = ["json"] }
+jwt-simple = "0.11.2"
+uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
+chrono = { version = "0.4.31", features = ["serde"] }
+hex = "0.4.3"
+serde_json = { version = "1.0.108", features = ["arbitrary_precision", "preserve_order"] }
+log = "0.4.20"
+
+[dev-dependencies]
+env_logger = "0.10.1"
+tokio = { version = "1.35.1", features = ["full"] }
