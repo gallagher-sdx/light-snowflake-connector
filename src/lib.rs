@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bindings::Binding;
 use data_manipulation::DataManipulationResult;
 pub use errors::{SnowflakeError, SnowflakeResult};
-use jwt_simple::algorithms::RS256KeyPair;
+pub use jwt_simple::algorithms::RS256KeyPair;
 use reqwest::header::{HeaderMap, ACCEPT, AUTHORIZATION, CONTENT_TYPE, USER_AGENT};
 use response::QueryResponse;
 use serde::Serialize;
