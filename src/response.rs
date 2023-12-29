@@ -16,6 +16,16 @@ pub struct QueryResponse {
 }
 
 impl QueryResponse {
+    /// Get the number of rows in the response
+    pub fn num_rows(&self) -> usize {
+        self.result_set_meta_data.num_rows
+    }
+
+    /// Get the number of columns in the response
+    pub fn num_columns(&self) -> usize {
+        self.result_set_meta_data.row_type.len()
+    }
+
     /// Convert the response into `Cell`s in a list of lists format
     ///
     /// This most closely matches the format of the response from Snowflake
