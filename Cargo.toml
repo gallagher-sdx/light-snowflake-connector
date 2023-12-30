@@ -16,8 +16,8 @@ live-tests = []
 thiserror = "1.0.37"
 
 serde = { version = "1.0.147", features = ["derive"] }
-reqwest = { version = "0.11", features = ["json"] }
-jwt-simple = "0.11.2"
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+jwt-simple = { version = "0.12.6", default-features = false, features = ["pure-rust"] }
 uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
 chrono = { version = "0.4.31", features = ["serde"] }
 hex = "0.4.3"
