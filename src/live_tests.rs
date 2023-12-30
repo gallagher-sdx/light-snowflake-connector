@@ -45,7 +45,9 @@ async fn can_query_many_types() -> SnowflakeResult<()> {
         '666f6f'::binary,
         '2023-01-01 01:01:01'::timestamp_ntz,
         '2023-01-01 01:01:01'::timestamp_ltz,
-        '2023-01-01 01:01:01Z'::timestamp_tz
+        '2023-01-01 01:01:01Z'::timestamp_tz,
+        '2023-01-01'::date,
+        '01:01:01'::time
     ")?;
     let result = sql.query().await?;
     let cells = result.cells();
@@ -69,8 +71,21 @@ async fn can_query_many_types() -> SnowflakeResult<()> {
     // TODO: test timezone
     // Not sure how to do this without just comparing two implementations of the same thing
     assert!(matches!(cells[0][8], Cell::TimestampLtz(_)));
+    // TIMESTAMP_TZ is just too complex to support yet
     assert!(
         matches!(cells[0][9], Cell::Null
+    ));
+    assert!(matches!(cells[0][10],
+        Cell::Date(ref x)
+        if x.year() == 2023
+        && x.month() == 1
+        && x.day() == 1
+    ));
+    assert!(matches!(cells[0][11],
+        Cell::Time(ref x)
+        if x.hour() == 1
+        && x.minute() == 1
+        && x.second() == 1
     ));
     Ok(())
 }

@@ -1,6 +1,6 @@
 use chrono::{
     naive::{NaiveDate, NaiveDateTime, NaiveTime},
-    DateTime, Local, TimeZone,
+    DateTime, Local, TimeZone, Duration,
 };
 
 // include getters and setters for the bindings
@@ -46,7 +46,7 @@ impl RawCell {
             RawCell::Text => Cell::Varchar(value.to_owned()),
             RawCell::Binary => Cell::Binary(hex::decode(value).unwrap()),
             RawCell::Boolean => Cell::Boolean(value.parse().unwrap()),
-            RawCell::Date => Cell::Date(value.parse().unwrap()),
+            RawCell::Date => Cell::Date(NaiveDate::from_ymd_opt(1970, 1, 1).unwrap() + Duration::days(value.parse().unwrap())),
             RawCell::Time => {
                 let seconds_since_epoch: f64 = value.parse().unwrap();
                 Cell::Time(
