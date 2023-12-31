@@ -5,7 +5,7 @@ use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 /// These don't round trip because the format Snowflake returns is different,
 /// and those are in `cells::Cell`.
 #[derive(Clone, Debug, serde::Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "value_type")]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "type")]
 pub enum Binding {
     Boolean { value: String },
     Fixed { value: String },
@@ -33,7 +33,7 @@ macro_rules! impl_binding {
         }
     };
 }
-impl_binding!(bool, Fixed);
+impl_binding!(bool, Text);
 impl_binding!(i8, Fixed);
 impl_binding!(i16, Fixed);
 impl_binding!(i32, Fixed);

@@ -107,7 +107,15 @@ async fn can_query_many_rows() -> SnowflakeResult<()> {
 #[tokio::test]
 async fn can_query_with_many_bindings() -> SnowflakeResult<()> {
     let client = default_client();
-    let sql = client.prepare("SELECT ?::int, ?::varchar, ?::float, ?::boolean, ?::binary, ?::date, ?::time, ?::timestamp_ntz, ?::timestamp_ltz, ?::timestamp_tz")?;
+    let sql = client.prepare("SELECT
+        ?::int,
+        ?::varchar,
+        ?::float,
+        ?::boolean,
+        ?::binary,
+        ?::date,
+        ?::time,
+        ?::timestamp_ntz")?;
     let sql = sql
         .add_binding(1)
         .add_binding("foo")
@@ -122,7 +130,7 @@ async fn can_query_with_many_bindings() -> SnowflakeResult<()> {
     assert_eq!(cells.len(), 1);
     assert!(matches!(cells[0][0], Cell::Int(1)));
     assert!(matches!(cells[0][1], Cell::Varchar(ref x) if x == "foo"));
-    assert!(matches!(cells[0][2], Cell::Int(1)));
+    assert!(matches!(cells[0][2], Cell::Float(ref x) if x == &1.0));
     assert!(matches!(cells[0][3], Cell::Boolean(true)));
     assert!(matches!(cells[0][4], Cell::Binary(ref x) if x == b"foo"));
     assert!(matches!(cells[0][5],

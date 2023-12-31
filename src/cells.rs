@@ -8,7 +8,7 @@ use chrono::{
 #[serde(rename_all = "snake_case")]
 pub enum RawCell {
     Fixed,
-    Float,
+    Real,
     Text,
     Binary,
     Boolean,
@@ -42,7 +42,7 @@ impl RawCell {
                 Ok(value) => Cell::Int(value),
                 Err(_) => Cell::Float(value.parse().unwrap()),
             },
-            RawCell::Float => Cell::Float(value.parse().unwrap()),
+            RawCell::Real => Cell::Float(value.parse().unwrap()),
             RawCell::Text => Cell::Varchar(value.to_owned()),
             RawCell::Binary => Cell::Binary(hex::decode(value).unwrap()),
             RawCell::Boolean => Cell::Boolean(value.parse().unwrap()),
