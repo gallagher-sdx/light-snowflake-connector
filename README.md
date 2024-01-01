@@ -1,6 +1,10 @@
 # Light Snowflake Connector
 Minimal wrapper around Snowflake's public REST API.
 
+[![Docs](https://img.shields.io/badge/API_Documentation-docs.rs-orange)](https://docs.rs/light-snowflake-connector/0.1.0/light_snowflake_connector/)
+[![Package](https://img.shields.io/badge/crates.io-0.1.0-green)](https://crates.io/crates/light-snowflake-connector/)
+
+
 - Easy to use
 - Intended for small, tactical queries and point lookups,
   - Particularly for dashboards and other interactive use cases
