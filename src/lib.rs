@@ -81,6 +81,6 @@ pub struct SnowflakeClient {
 }
 impl SnowflakeClient {
     pub fn prepare(&self, sql: &str) -> Statement {
-        Statement::new(sql, &self)
+        Statement::new(sql, self)
     }
 }

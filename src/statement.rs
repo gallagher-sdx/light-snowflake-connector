@@ -200,7 +200,7 @@ impl QueryResponse {
             Ok(None)
         } else {
             let url =
-                self.statement.host.trim_end_matches("/").to_owned() + &self.statement_status_url;
+                self.statement.host.trim_end_matches('/').to_owned() + &self.statement_status_url;
             let response = self
                 .statement
                 .client()?
@@ -227,9 +227,10 @@ impl QueryResponse {
     ///
     /// In order to improve concurrency, this will buffer one partition,
     /// so you can have one partition in flight while processing another.
-    pub fn partitions<'t>(&'t self) -> impl TryStream<Ok = Partition, Error = SnowflakeError> + 't {
-        futures::stream::iter(0..self.num_partitions())
-            .then(move |index| async move { self.partition(index) })
+    pub fn partitions(&self) -> impl TryStream<Ok = Partition, Error = SnowflakeError> + '_ {
+        let partition_futures = (0..self.num_partitions())
+            .map(|index| self.partition(index));
+        futures::stream::iter(partition_futures)
             .buffered(1)
             .then(move |partition| async move {
                 // We can't be out of bounds, so remove the Option
@@ -265,9 +266,9 @@ impl QueryResponse {
     ///
     /// If you only need one partition, it may be simpler to use `partition`
     /// and then stream over the rows in that partition.
-    pub fn rows<'t>(&'t self) -> impl TryStream<Ok = Vec<Cell>, Error = SnowflakeError> + 't {
+    pub fn rows(&self) -> impl TryStream<Ok = Vec<Cell>, Error = SnowflakeError> + '_ {
         self.partitions()
-            .map_ok(|partition| futures::stream::iter(partition.cells()).map(|row| Ok(row)))
+            .map_ok(|partition| futures::stream::iter(partition.cells()).map(Ok))
             .try_flatten()
     }
 
@@ -277,11 +278,11 @@ impl QueryResponse {
     ///
     /// In order to improve concurrency, this will buffer one partition,
     /// so you can have one partition in flight while processing another.
-    pub fn json_tables<'t>(
-        &'t self,
-    ) -> impl TryStream<Ok = Vec<serde_json::Value>, Error = SnowflakeError> + 't {
+    pub fn json_tables(
+        &self,
+    ) -> impl TryStream<Ok = Vec<serde_json::Value>, Error = SnowflakeError> + '_ {
         self.partitions()
-            .map_ok(|partition| futures::stream::iter(partition.json_table()).map(|row| Ok(row)))
+            .map_ok(|partition| futures::stream::iter(partition.json_table()).map(Ok))
             .try_flatten()
     }
 
@@ -291,11 +292,11 @@ impl QueryResponse {
     ///
     /// In order to improve concurrency, this will buffer one partition,
     /// so you can have one partition in flight while processing another.
-    pub fn json_objects<'t>(
-        &'t self,
-    ) -> impl TryStream<Ok = serde_json::Value, Error = SnowflakeError> + 't {
+    pub fn json_objects(
+        &self,
+    ) -> impl TryStream<Ok = serde_json::Value, Error = SnowflakeError> + '_ {
         self.partitions()
-            .map_ok(|partition| futures::stream::iter(partition.json_objects()).map(|row| Ok(row)))
+            .map_ok(|partition| futures::stream::iter(partition.json_objects()).map(Ok))
             .try_flatten()
     }
 }

@@ -1,4 +1,4 @@
-use serde::{de::DeserializeOwned, Deserialize};
+
 
 #[derive(thiserror::Error, Debug)]
 pub enum SnowflakeError {

@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use serde::Deserialize;
+
 
 use crate::{
-    cells::{Cell, RawCell},
+    cells::{Cell},
     statement::WireStatementMetaData,
 };
 pub type StringTable = Vec<Vec<Option<String>>>;
