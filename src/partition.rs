@@ -1,13 +1,15 @@
 use std::sync::Arc;
 
-
-
-use crate::{
-    cells::{Cell},
-    statement::WireStatementMetaData,
-};
+use crate::{cells::Cell, statement::WireStatementMetaData};
 pub type StringTable = Vec<Vec<Option<String>>>;
 
+/// A single in-memory chunk of a query response
+///
+/// Most partitions are in the single digits of megabytes, so clones are not
+/// too expensive, but still should be avoided if possible.
+///
+/// The data returned from Snowflake is a list of lists of strings, so there
+/// are many type conversions involved, see [`Cell`](`crate::Cell`) for more
 pub struct Partition {
     pub(crate) meta_data: WireStatementMetaData,
     pub(crate) data: Arc<StringTable>,

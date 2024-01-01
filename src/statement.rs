@@ -10,6 +10,8 @@ use crate::errors::{SnowflakeError, SnowflakeResult, SnowflakeWireResult};
 use crate::partition::{Partition, StringTable};
 use crate::{jwt, SnowflakeClient};
 
+/// A builder for a prepared statement (created by SnowflakeClient)
+///
 #[derive(Debug, Clone)]
 pub struct Statement {
     host: String,
@@ -19,6 +21,10 @@ pub struct Statement {
 }
 
 impl Statement {
+    /// Create a new statement from a SQL string and a SnowflakeClient
+    ///
+    /// Usually you will want to use [`SnowflakeClient::prepare`] instead of this method
+    /// but the difference is merely ergonomic.
     pub fn new(sql: &str, config: &crate::SnowflakeClient) -> Statement {
         Statement {
             host: format!(
@@ -27,7 +33,7 @@ impl Statement {
             ),
             wire: WireStatement {
                 statement: sql.to_owned(),
-                timeout: None,
+                timeout: Some(30),
                 database: config.database.to_ascii_uppercase(),
                 warehouse: config.warehouse.to_ascii_uppercase(),
                 role: config.role.as_ref().map(|x| x.to_ascii_uppercase()),
@@ -61,6 +67,9 @@ impl Statement {
 
         Ok(reqwest::Client::builder()
             .default_headers(headers)
+            .timeout(std::time::Duration::from_secs(
+                self.wire.timeout.unwrap_or(30) + 15,
+            ))
             .build()?)
     }
 
@@ -79,6 +88,13 @@ impl Statement {
             .send()
             .await?)
     }
+
+    /// Execute SQL that returns a result set
+    ///
+    /// This supports multiple partitions, which are streamed lazily
+    /// but the first partition is buffered immediately.
+    ///
+    /// For a single partition, consider using [`QueryResponse::only_partition`].
     pub async fn query(&self) -> Result<QueryResponse, SnowflakeError> {
         Ok(self
             .send()
@@ -88,18 +104,50 @@ impl Statement {
             .into_result()?
             .hydrate(self.clone()))
     }
-    /// Use with `delete`, `insert`, `update` row(s).
-    pub async fn manipulate(&self) -> Result<WireDMLResult, SnowflakeError> {
-        self.send()
+
+    /// Execute SQL that does not return a result set
+    ///
+    /// This is useful for DML statements like `INSERT`, `UPDATE`, and `DELETE`
+    pub async fn manipulate(&self) -> Result<Changes, SnowflakeError> {
+        let dml_reslt = self
+            .send()
             .await?
             .json::<SnowflakeWireResult<WireDMLResult>>()
             .await?
-            .into_result()
+            .into_result()?;
+        Ok(Changes {
+            message: dml_reslt.message,
+            rows_inserted: dml_reslt.stats.rows_inserted,
+            rows_deleted: dml_reslt.stats.rows_deleted,
+            rows_updated: dml_reslt.stats.rows_updated,
+            duplicates: dml_reslt.stats.duplicates,
+        })
     }
-    pub fn with_timeout(mut self, timeout: u32) -> Statement {
-        self.wire.timeout = Some(timeout);
+
+    /// Set the Snowflake-side timeout for the statement
+    ///
+    /// The client-side timeout will automatically be set to this value plus 15 seconds
+    ///
+    /// The default server side timeout is 172800 seconds (2 days),
+    /// which is far too long for the use cases this library is targeting,
+    /// so this library defaults to 30 seconds on the server side if not specified,
+    /// implying a client-side timeout of 45 seconds.
+    pub fn with_timeout(mut self, timeout_seconds: u64) -> Statement {
+        self.wire.timeout = Some(timeout_seconds);
         self
     }
+    /// Add a binding to the statement
+    ///
+    /// Several types are supported:
+    ///
+    /// * All integers are converted to `i128` and bound as `NUMBER`
+    /// * `f64` and `f32` are bound as `REAL`
+    /// * `bool`, `&str`, `String`, `chrono::NaiveDate`, `chrono::NaiveDateTime`, and `chrono::NaiveTime` are bound as `TEXT`
+    ///
+    /// More types may be supported in the future.
+    ///
+    /// Text is the most flexible type, and for additional types you can usually workaround by
+    /// converting to text before binding. Or, you could contribute to this library and add support
     pub fn add_binding<T: Into<Binding>>(mut self, value: T) -> Statement {
         let bindings = &mut self.wire.bindings;
         bindings.insert((bindings.len() + 1).to_string(), value.into());
@@ -107,16 +155,12 @@ impl Statement {
     }
 }
 
-#[derive(Serialize, Debug, Clone)]
-struct WireStatement {
-    statement: String,
-    timeout: Option<u32>,
-    database: String,
-    warehouse: String,
-    role: Option<String>,
-    bindings: HashMap<String, Binding>,
-}
-
+/// The result of SQL that returns rows
+///
+/// The first partition is included immediately,
+/// but additional partitions are streamed lazily and incur additional IO.
+///
+/// You might consider using [`QueryResponse::only_partition`] if you only need one partition.
 #[derive(Debug)]
 pub struct QueryResponse {
     result_set_meta_data: WireStatementMetaData,
@@ -125,31 +169,17 @@ pub struct QueryResponse {
     statement: Statement,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct WireQueryResponse {
-    result_set_meta_data: WireStatementMetaData,
-    data: Arc<StringTable>,
-    // code: String,
-    statement_status_url: String,
-    // request_id: String,
-    // sql_state: String,
-    // message: String,
-}
-impl WireQueryResponse {
-    fn hydrate(self, statement: Statement) -> QueryResponse {
-        QueryResponse {
-            result_set_meta_data: self.result_set_meta_data,
-            data: self.data,
-            statement_status_url: self.statement_status_url,
-            statement,
-        }
-    }
-}
-
-#[derive(Deserialize, Debug)]
-struct WirePartitionResponse {
-    data: Arc<StringTable>,
+/// The result of a DML statement
+///
+/// These are returned by [`Statement::manipulate`] and are almost exactly
+/// the same as the response from Snowflake.
+#[derive(Debug)]
+pub struct Changes {
+    pub message: String,
+    pub rows_inserted: usize,
+    pub rows_deleted: usize,
+    pub rows_updated: usize,
+    pub duplicates: usize,
 }
 
 impl QueryResponse {
@@ -168,9 +198,18 @@ impl QueryResponse {
         self.result_set_meta_data.partition_info.len()
     }
 
+    /// Column types in the result set
+    ///
+    /// In most cases Cell should already expose the data you need,
+    /// but if you use the raw strings or want information about nullability, etc,
+    /// this can be useful.
+    pub fn column_types(&self) -> &[ColumnType] {
+        &self.result_set_meta_data.row_type
+    }
+
     /// A convenience method to assert that there is only one partition and return it
     ///
-    /// This never causes IO, is not async, and can only error with MultiplePartitions
+    /// This never causes IO, is not async, and can only error with [`SnowflakeError::MultiplePartitions`]
     pub fn only_partition(self) -> SnowflakeResult<Partition> {
         if self.num_partitions() != 1 {
             Err(SnowflakeError::MultiplePartitions)
@@ -228,8 +267,7 @@ impl QueryResponse {
     /// In order to improve concurrency, this will buffer one partition,
     /// so you can have one partition in flight while processing another.
     pub fn partitions(&self) -> impl TryStream<Ok = Partition, Error = SnowflakeError> + '_ {
-        let partition_futures = (0..self.num_partitions())
-            .map(|index| self.partition(index));
+        let partition_futures = (0..self.num_partitions()).map(|index| self.partition(index));
         futures::stream::iter(partition_futures)
             .buffered(1)
             .then(move |partition| async move {
@@ -338,7 +376,7 @@ mod tests {
 pub(crate) struct WireStatementMetaData {
     pub num_rows: usize,
     //pub format: String,
-    pub row_type: Vec<WireRowType>,
+    pub row_type: Vec<ColumnType>,
     // The partition ino mostly doesn't matter, only the number of partitions
     pub partition_info: Vec<WirePartitionInfo>,
 }
@@ -351,21 +389,34 @@ pub(crate) struct WirePartitionInfo {
     //pub compressed_size: Option<usize>,
 }
 
+/// The type of a column in the result set
+///
+/// In most cases Cell should already expose the data you need,
+/// but if you use the raw strings or need additional information like nullability, etc,
+/// this can be useful.
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct WireRowType {
+pub struct ColumnType {
+    /// The name of the column
     pub name: String,
+    /// The database the column is in
     pub database: String,
+    /// The schema the column is in
     pub schema: String,
+    /// The table the column is in
     pub table: String,
+    /// How many decimal digits of precision the column has
+    /// (this is usually 38)
     pub precision: Option<u32>,
+    /// The length of the column in bytes
     pub byte_length: Option<usize>,
     #[serde(rename = "type")]
+    /// The format used when serializing the type to String before returning it
     pub data_type: RawCell,
+    // The number of decimal digits of scale the column has (after the decimal point, usually 0)
     pub scale: Option<i32>,
+    // Whether the column can be null
     pub nullable: bool,
-    //pub collation: ???,
-    //pub length: ???,
 }
 
 #[derive(Deserialize, Debug)]
@@ -384,4 +435,42 @@ pub struct WireChanges {
 pub struct WireDMLResult {
     pub message: String,
     pub stats: WireChanges,
+}
+
+impl WireQueryResponse {
+    fn hydrate(self, statement: Statement) -> QueryResponse {
+        QueryResponse {
+            result_set_meta_data: self.result_set_meta_data,
+            data: self.data,
+            statement_status_url: self.statement_status_url,
+            statement,
+        }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+struct WirePartitionResponse {
+    data: Arc<StringTable>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+struct WireStatement {
+    statement: String,
+    timeout: Option<u64>,
+    database: String,
+    warehouse: String,
+    role: Option<String>,
+    bindings: HashMap<String, Binding>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct WireQueryResponse {
+    result_set_meta_data: WireStatementMetaData,
+    data: Arc<StringTable>,
+    // code: String,
+    statement_status_url: String,
+    // request_id: String,
+    // sql_state: String,
+    // message: String,
 }

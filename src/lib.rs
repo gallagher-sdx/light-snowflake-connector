@@ -1,8 +1,4 @@
-//! This module provides a Snowflake connector for Rust.
-//!
-//! The `lib.rs` file contains the main implementation of the Snowflake connector.
-//! It includes the `ClientConfig` struct, which represents the configuration for connecting to Snowflake,
-//! and the `SnowflakeClient` struct, which is responsible for creating SQL statements against Snowflake.
+//! A lightweight Snowflake connector for Rust.
 //!
 //! Example usage:
 //!
@@ -49,8 +45,6 @@
 //!     Ok(())
 //! }
 //! ```
-//!
-//! For more information, refer to the [Snowflake Connector for Rust documentation](https://docs.rs/snowflake_connector).
 use jwt_simple::algorithms::RS256KeyPair;
 
 mod bindings;
@@ -62,24 +56,43 @@ mod live_tests;
 mod partition;
 mod statement;
 
-pub use cells::Cell;
+pub use cells::{Cell, RawCell};
 pub use errors::{SnowflakeError, SnowflakeResult};
 pub use jwt_simple;
 pub use partition::Partition;
-pub use statement::{QueryResponse, Statement};
+pub use statement::{Changes, QueryResponse, Statement};
 
 mod jwt;
 
+/// Configuration for making connections to Snowflake
 #[derive(Debug, Clone)]
 pub struct SnowflakeClient {
+    /// The RSA key pair used to sign the JWT.
+    ///
+    /// There are many ways to generate or load this key pair depending on your deployment.
+    /// * You can generate one with [`jwt_simple::algorithms::RS256KeyPair::generate`]
+    /// * You can load one from a PEM file with [`jwt_simple::algorithms::RS256KeyPair::from_pem`]
+    /// * You can load one from a DER file with [`jwt_simple::algorithms::RS256KeyPair::from_der`]
+    /// * In turn you might combine any of these with volume mounts, PVCs, Vault, Secrets Manager, etc.
     pub key_pair: RS256KeyPair,
+    /// The Snowflake account name. This should be two parts separated by a dot,
+    /// and it might look like `AAA00000.us-east-1`
     pub account: String,
+    /// The Snowflake user name.
     pub user: String,
+    /// The Snowflake database name. (This is required and it cannot be `""`)
     pub database: String,
+    /// The Snowflake warehouse name. (This is required and it cannot be `""`)
     pub warehouse: String,
+    /// The Snowflake role name. This is optional only if you have configured your user
+    /// to have a default role.
     pub role: Option<String>,
 }
 impl SnowflakeClient {
+    /// Prepare a SQL statement for execution
+    ///
+    /// This does not send anything to Snowflake and it's infallible because it does not
+    /// interact with the network or test that the SQL is valid.
     pub fn prepare(&self, sql: &str) -> Statement {
         Statement::new(sql, self)
     }

@@ -3,19 +3,32 @@ use chrono::{
     DateTime, Duration, Local, TimeZone,
 };
 
-// include getters and setters for the bindings
+/// The format Snowflake used for serializing data in a column
+///
+/// This is not usually necessary unless you intend to implement your own
+/// deserialization of Snowflake data.
 #[derive(Clone, Debug, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RawCell {
+    /// A 128-bit signed integer, 38 digits of precision.
     Fixed,
+    /// A 64-bit floating point number, 15 digits of precision.
     Real,
+    /// A variable length string. It must be valid UTF-8.
     Text,
+    /// A variable length binary string.
     Binary,
+    /// A boolean value.
     Boolean,
+    /// A date without a time zone, as the number of days since 1970-01-01.
     Date,
+    /// A time without a time zone, as the number of seconds since midnight.
     Time,
+    /// A timestamp with the local time zone.
     TimestampLtz,
+    /// A timestamp without a time zone.
     TimestampNtz,
+    /// A timestamp with a time zone for each value. This is not supported yet.
     TimestampTz,
 }
 
@@ -84,17 +97,40 @@ impl RawCell {
     }
 }
 
+/// Cell types, used for receiving data from Snowflake.
+///
+/// Snowflake returns these as a list of Strings; these are the result of parsing those strings,
+/// and as such there are some caveats to be aware of.
 #[derive(Clone, Debug)]
 pub enum Cell {
+    /// A `NULL` value. Any column could be null unless it is declared as `NOT NULL`,
+    /// but the driver is not aware of this information from the metadata.
     Null,
+    /// A 128-bit signed integer, 38 digits of precision.
+    /// Any NUMBER cell that can be represented as an integer will be, but
+    /// this means that NUMBER columns can contain mixed types: Int and Float.
+    ///
+    /// e.g. `["1", "1.0", "1.1"]` will be parsed as `[Int(1), Int(1), Float(1.1)]`
     Int(i128),
+    /// A 64-bit floating point number, 15 digits of precision.
+    /// Any NUMBER cell that cannot be represented as an integer will be parsed as a float.
+    /// Additionally, all REAL columns will be parsed as floats.
+    /// This is lossy, but intended for convenience.
     Float(f64),
+    /// A variable length string. It must be valid UTF-8.
     Varchar(String),
+    /// A variable length binary string.
+    /// (This is serialized over the wire as a hex string, so these are not bandwidth efficient.)
     Binary(Vec<u8>),
+    /// A boolean value.
     Boolean(bool),
+    /// A date without a time zone.
     Date(NaiveDate),
+    /// A time without a time zone.
     Time(NaiveTime),
+    /// A timestamp with the local time zone. (This is not extensively tested)
     TimestampLtz(DateTime<Local>),
+    /// A timestamp without a time zone. Presumably this is UTC, but it is not specified.
     TimestampNtz(NaiveDateTime),
 }
 
