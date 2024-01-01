@@ -1,6 +1,6 @@
 use chrono::{
     naive::{NaiveDate, NaiveDateTime, NaiveTime},
-    DateTime, Local, TimeZone, Duration,
+    DateTime, Duration, Local, TimeZone,
 };
 
 // include getters and setters for the bindings
@@ -46,7 +46,10 @@ impl RawCell {
             RawCell::Text => Cell::Varchar(value.to_owned()),
             RawCell::Binary => Cell::Binary(hex::decode(value).unwrap()),
             RawCell::Boolean => Cell::Boolean(value.parse().unwrap()),
-            RawCell::Date => Cell::Date(NaiveDate::from_ymd_opt(1970, 1, 1).unwrap() + Duration::days(value.parse().unwrap())),
+            RawCell::Date => Cell::Date(
+                NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()
+                    + Duration::days(value.parse().unwrap()),
+            ),
             RawCell::Time => {
                 let seconds_since_epoch: f64 = value.parse().unwrap();
                 Cell::Time(
@@ -101,7 +104,12 @@ impl From<Cell> for serde_json::Value {
         use Cell::*;
         match cell {
             Null => json!(null),
-            Int(value) => json!(value),
+            // This is a little hairy because very large numbers
+            // can be represented as integers in json (it's unbounded precision)
+            // but JS cannot so it's customary to convert numbers to strings
+            // if the value can't be represented as an int in a f64.
+            Int(value) if value.abs() < (1 << 53) => json!(value as i64),
+            Int(value) => json!(value.to_string()),
             Float(value) => json!(value),
             Varchar(value) => json!(value),
             Binary(value) => json!(hex::encode(value)),
