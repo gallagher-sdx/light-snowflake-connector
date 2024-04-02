@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Lightweight wrapper around Snowflake's REST API"
 readme = "README.md"
-repository = "https://github.com/gallagher-sdx/light-snowflake-connector"
+repository = "https://github.com/smarterdx/light-snowflake-connector"
 keywords = ["snowflake", "data-science"]
 categories = ["database"]
 
@@ -15,16 +15,16 @@ live-tests = []
 [dependencies]
 thiserror = "1.0.37"
 
-serde = { version = "1.0.147", features = ["derive", "rc"] }
-reqwest = { version = "0.11", features = ["json", "rustls-tls", "gzip"], default-features = false }
-jwt-simple = { version = "0.12.6", default-features = false, features = ["pure-rust"] }
-uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics"] }
-chrono = { version = "0.4.31", features = ["serde"] }
-hex = "0.4.3"
-serde_json = { version = "1.0.108", features = ["arbitrary_precision", "preserve_order"] }
-log = "0.4.20"
-futures = "0.3.30"
+serde = { version = "1.0", features = ["derive", "rc"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "gzip"], default-features = false }
+jwt-simple = { version = "0.12", default-features = false, features = ["pure-rust"] }
+uuid = { version = "1.8", features = ["v4", "fast-rng", "macro-diagnostics"] }
+chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4"
+serde_json = { version = "1.0", features = ["arbitrary_precision", "preserve_order"] }
+log = "0.4"
+futures = "0.3"
 
 [dev-dependencies]
-env_logger = "0.10.1"
-tokio = { version = "1.35.1", features = ["full"] }
+env_logger = "0.10"
+tokio = { version = "1.37", features = ["full"] }
